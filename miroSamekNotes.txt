@@ -401,7 +401,8 @@ Lesson 25: RTOS part-4:
 -Instead of delay wasting cpu cycles, we can put the thread into blocking state and when the delay is elapsed the thread can
 resume executing. If all threads are in blocked state, the cpu will execute the idle thread which ideally puts the cpu in low
 power mode(_WFI()). It is efficient to store the state of the thread in single uint32_t as a bitmask so that if no threads are
-ready as simple comparison to 0 is enough. This is a baasic time shared round robin type of scheduler. OSThread structure will have a timeout member which handles the timing.
+ready as simple comparison to 0 is enough. This is a baasic time shared round robin type of scheduler. OSThread structure will
+have a timeout member which handles the timing.
 
 Lesson 26: RTOS part-5:
 -Priority-based, preemptive scheduler with static priorities. to meet real time requirement of the systems under certain
@@ -456,10 +457,10 @@ mutual-exclusion mechanisms..Priority inheritance mutex are dynamic as the prior
 unlock the thead whereas in ceiling mutex the priority is promoted to the highest at the begining.
 
 Lesson 29: OOP-part1-Encapsulation:
--OOP is not the use of any specific language, but rather a way of software design based on the three fundamental concepts of:Encapsulation,
--Inheritance and Polymorphism. In C, the "what has to be done" is in header(.h) file while "how it has to be done" is in
-source(.c) file. This is abstraction( because all the details of handling the cases abstracted away and simplified into
-operations like on, off, and toggle) and information hiding(because the information about specific ways of performing these
+-OOP is not the use of any specific language, but rather a way of software design based on the three fundamental concepts
+of:Encapsulation, Inheritance and Polymorphism. In C, the "what has to be done" is in header(.h) file while "how it has to be 
+done" is in source(.c) file. This is abstraction( because all the details of handling the cases abstracted away and simplified 
+into operations like on, off, and toggle) and information hiding(because the information about specific ways of performing these
 operations for each cases is hidden from the users). The limitation in such a case is that the design handles only a fixed number
 of cases and it cannot be easily extended to handle an open-ended number of cases.
 
