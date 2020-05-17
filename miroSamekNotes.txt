@@ -1,0 +1,466 @@
+Lesson 1:Counting.
+-Most of the ARM Cortex instruction takes 2 bytes in memory.
+-ARM Cortex has 16 32-bit wide general purpose R0-R15. R15 is PC.
+-Instructions can typically manipulate registers in one clock cycle.
+-Signed = integers are stored as 2's complement.
+-0x0000 0000(0) ... 0x7fff ffff(2^31-1 or 2147483647) (largest positive value 32-bit signed integer can represent).
+-On adding 1 to that, we make it to 0x8000 0000(-2^31 or -2147483648) (smallest negative value 32-bit signed integer can represent)
+all the way to 0xffff ffff(largest negative value it can represent ie -1).
+-On incrementing this again we get to 0x0000 0000 and the cycle repeats.
+-For unsigned integers it starts from 0x0000 0000(smallest positive:0) to 0xffff ffff (largest positive:4294967295)
+
+https://stackoverflow.com/questions/38459556/iar-window-layout
+Lesson 2:Flow of Control.
+-Typically, pure sequential code will increment PC to point to the next instruction. We use flow control to affect this hard wired
+behaviour so as to have decision making at run time.
+-B instruction is a branch instruction that modifies the PC so it skips over a few Instructions.
+-CMP instruction modifies APSR(Application Program Status Register) - N/Z/C/V/Q flags
+-Conditional branch BLT.N jumps on negative flag set. The op code has the info about the offset to be added to the current PC, so
+can jump up or down the code. For ex. 0x7e:0xdbfc - 0xd means encoding T1/0xfc is the offset ie. add current value of PC to
+offset to know the address to jump 0x7e+0xfc(signed) so 0x7e-0x04 = 0x7a. The PC jumps backwards therefore we have a loop.
+-Effects of loop in time critical code(ex. interrupt processing):
+-loop overhead : the processor has to execute additional tests and jumps to handle the loop.Therefore can use loop unrolling to
+speed things up in time critical codes.
+-pipeline stalls :ARM Cortex M uses pipeline to increase the throughput. Processor works with multiple instructions at various
+stages of completion. One instruction is divided into steps like fetch from memory,decode and execute. These individual steps
+take one clock cycle to execute. Pipeline works at full capacity when instructions are executed in order. When the ordering is
+disrupted by branch instruction, it has to discard the partially processed Instructions and restart pipelining at the new branced
+address.
+
+Lesson 3:Variables and Pointers.
+-ARM has RISC architecture, therefore memory can only be read by special load instruction and all the data manipulations must
+happen in the data registers, and the modified registers values can be stored back in the memory by store instruction as opposed
+to CISC. STR and LDR.N involves memory addresses. In C pointers are used for handling addresses.
+-One can store raw addresses in pointers by type casting. 
+eg. int *p_int; 
+p_int = (unsigned int *)0x20000002u;//misaligned address can overwrite existing values in memory addresses.
+-address 0x2000 0000 has 0x2000 0000,0x2000 0001,0x2000 0002,0x2000 0003 to store a 32 bit integer(4 bytes) and then uses 0x2000
+0004 ... 0x2000 0007 to store the next integer. p_int is intentionally misaligned and code will store whatever value to 0x2000
+0002 corrupting a stored integer if already in place.
+
+Lesson 4:Blinking the LED.
+-To blink LED, you have to know about the memory map of the microcontroller.
+-The technique to blocking clock to certain parts of the chip to save power is called clock gating.
+-So initially you cannot read any data at address of PORTF.
+-While in debug mode, on setting the bit on clock gating control register, it provides clock to PORTF and you can see the data in
+that address range. The hardware block wakes up.
+-It boils down to writing a number to a memory address. So pointers in C, to deference the address directly and put a value to it.
+-eg *((unsigned int *)0x400FE608U) = 0x20; //to provide clock to PORTF
+-We can make it blink by adding to looping statements after turning on and off the LED.
+
+Lesson 5:Preprocessor and Volatile.
+-Better to put all those magic numbers(addresses and data) as macros. Better to enclose the definition inside brackets so that is
+always means the same thing everytime.
+-Comments are allowed wherever you can place a space.
+-In assembly, it is the STR instruction that finally turns the LED on/off. So the CPU point of view,controlling a peripheral is
+writing a value at an address.
+-All the macros are vendor provided.
+-In the vendor provided file, the addresses are volatile unsigned long * as in 32-bit machine unsigned int and unsigned long are
+both 4 bytes long. Volatile tells the compiler that the value may change even though the program might not appear to change it.
+CPU can optimize access to non-volatile objects by reading the object into a register, working with that register for a while and
+then wrtiting the value back to the object. You can prevent the compiler to optimize any object away by declaring it as volatile.
+Volatile can be placed before or after the type ie volatile int and int volatile are the same.
+
+Lesson 6:Bitwise operators in C.
+Lesson 7:Arrays and Pointer Arithmetic
+-When you use Bitwise operators on registers, the compiler converts it into read,modify and write operations, as all the bits are
+collocated in a single byte with single address. If a interrupt happens after read and the ISR changes the state of register, and
+when the inerrupt returns the change will be lost as it will use the old value of register. This is not reentrant code. There is a
+way to address individual bits in a single operation, using bit-banding, where each bit has a different address, which can be
+accessed with array indexing.
+-This makes setting or clearing the bit a single STR instruction, making it interrupt-safe.
+-We can make it even faster by using AHB bus as GPIO peripherals are connected to both APB and AHB for backward compatibility.
+This is done by setting a bit in GPIO High Performance Bus Control Register.
+
+Lesson 8:Functions and Stack.
+-Function calls boils down to BL(4 bytes) instruction that changes the PC and also saves the next instruction's address in LR(LSB
+is set to 1 if using ARM Thumb 2 instruction set).
+-The function code starts by adjusting the SP register to create space to store the local variables. Return from function happens
+by reversing all the effects on SP and BX instruction(branch and exchange). Only the SP register is changed the values at those
+previous memory locations are not cleared,there will be values from the previous uses of the RAM and thus uninitialised automatic
+values contain garbage.
+-Instructions can only be in even addresses, else bus fault occurs.
+-PUSH instruction saves LR on the stack and automatically and atomically descreases the SP.
+-Stack is used for two purposes : holds the local variables and hold the return addresses.
+-Function arguments allow you to specify initial values of local variables at the point the function is called.
+
+https://community.arm.com/developer/ip-products/processors/b/processors-ip-blog/posts/function-parameters-on-32-bit-arm
+https://stackoverflow.com/questions/15071506/how-to-access-more-than-4-arguments-in-an-arm-assembly-function
+Lesson 9:Modules,Recursion,AAPCS.
+-Functions also allows for writing codes in different files(so that instead of compiling the whole file again all you have to do
+is to compile the changed file and link it with other already compiled objects), with the definition in a source file and
+declaration(prototype) in a header file.
+-Inclusion guards for including the header files only once : 
+    #ifndef (mangled name of the file)
+    #define (") 
+    ...
+    #endif
+-If arguments are present then the arguments are stored in registers, and the function is called with BL instruction(branch and
+link). First thing the code does is to save the LR register as it is not a leaf function. At the end,POP instruction pops the
+saved address into PC, causing it to return. Return value is returned in R0 register.
+-AAPCS:R0-R3 and R12 for passing arguments and storing the return value. If the function code uses R4-R11 then is must save them
+on the stack and restore before returning. 
+
+Lesson 10:Stack Overflow and other Pitfalls of Functions.
+-Automatic variables have garbage values in them from previous uses of RAM/stack. If overflow the stack(maybe by recursively
+calling into functions having big variables), the SP may bottom out the stack and will reach begining of the RAM and processor
+may have bus fault exception(CPU is forced to access non existent memory).
+-Stack is for automatic variables, return addresses and arguments. Heaps are for dynamic memory allocation. Accessing beyond
+memory bounds(arrays are stored with its maximum index at near the begining of the stack) in automatic arrays will change the
+content at that location in stack intended for some other purpose and may corrupt the return indexes/automatic varables and
+arguments. (https://youtu.be/jmzvued3w3Y?t=933)This MAY cause it to return to some other lower address by coincidence and start
+executing vector table and then main again without popping main's initial frame. In this case the stack grows slowly and
+overflows. Check SP whenever fault occurs. 
+-Return addresses are odd as the LSB is thumb2 bit. 
+-Arguments are passed by value by default. Pointer arguments are used for passing by reference.
+-Inside a function, if pointers are returned they will go out of scope when the function returns. Pointers are stored in stack and
+will go out of scope(i.e SP points below the variable and cannot access them) when the function returns. so don't return
+pointers/pointers to local variables from the function. So to do it correctly, use local variables that are not on the stack that
+is use the static keyword. The word static in this context means that the amount of memory allocated for this kind of variables
+does not change while the application is running. This tells the compiler to allocate memory outside the stack so that it outlives
+the function even when it returns.
+
+Lesson 11:<stdint.h> and mixing types (See the code too)
+types of sizes provided:
+    int
+    unsigned int
+    short
+    unsigned short
+    char
+    unsigned char
+    long
+    unsigned long
+
+-C standard does not define the exact size only the following relation : sizeof(short) < sizeof(int) < sizeof(long). It is upto
+compiler to decide the exact size according to the CPU.
+-C99 ISO standard used stdint.h to provide fixed width data types, u/int8/16/32_t.
+-Compiler does not allocate the memory in the order of declaration.
+-ARM CPU has instructions for byte,half-word and full word store and load instructions. ARM has configurable endianness. Silicon
+vendors generally choose little endian.Little endian : LSB at lower address. Big endian : MSB at lower addresses.
+-C automatically promotes any smaller sized integers to built in int/unsigned int types before performing any operations on them.
+The precision of the computation does not depend on the left hand side of the assignment. Computation is performed at the largest
+precision of the involved operands.
+-For ex. 
+    In MSP430 (16-bit architecture)
+    uint16_t a = 40000U;uint16_t b = 30000U;uint32_t  c = a+b ;//c=4464(70000 truncated to 16-bits) //this will compute in 16-bits
+    and truncate the result but store it in a location with dynamic length of 32-bits.
+    Solution is to type cast one or both of the operands to uint32_t.
+-If you mix signed and unsigned operands(or in comparison) both are promoted to unsigned ints and the result is unsigned int.
+For eg. 
+    unint32_t u32e = 0xe1e2e3e4U;
+    if(u32e > -1) // will always be false as -1 promoted ot unsigned int is the largest positive 32-bit number 0xFFFFFFFF.
+-But if it is stored inside signed int then the result is converted as signed int. If in 16-bit, then it will fail to interpret it
+correctly if not type casted.
+-Binary operations on smaller data types, they are promoted to bigger data types and may not work as expected.again solution is
+type casting to prevent explicit promotion.
+
+Lesson 12: Structures and CMSIS.
+-Built in data types are scalar data types.
+-Arrays are for grouping data of the same type.
+-Structures are for grouping data of different types. In embedded systems, they help in accessing the hardware in an elegant way.
+
+struct Point{
+    int x,
+    int y
+};
+struct Point pa,pb;
+-------OR-------
+typedef struct Point Point;
+Point pa,pb;
+-------OR-------
+typedef struct {
+    int x,
+    int y
+}Point; //this does not allocate any memory and this form of declaration is recommended by misra c. tag name is needed only for
+self referential structures.
+
+Point pa,py;//this allocates the memory. 
+
+-dot operator has a higher precedence than arithmetic operators.
+-Compiler will honour the order of structure members exactly as you have types them in structure declaration, but it will padd as
+necessary. Cortex M processors are binary compatible with the upper ones in the same series. M0's STRH instruction cannot access
+half word at an odd address but M4's can. So non standard extension __packed removes the padding. For M4 it doesn't matter but M0
+uses more cycles to access the misaligned members. So alignment matters to the processors. Padding is default in standard C. 
+-Instead of passing big structures by value it is more efficient to pass pointers to structures.(*pp).x and pp->x are the same.
+-For compiler structures are just offsets from a base address and hence perfect for accessing hardware.
+-In CMSIS header file there are structure declarations for various peripherals and pointers are used to place them at the correct address.
+
+Lesson 13: Startup Code-1.(https://medium.com/@ly.lee/stm32-blue-pill-analyse-and-optimise-your-ram-and-rom-9fc805e16ed7)
+-.map file has placement summary that lists the program sections(contiguous sections of memory that have a symbolic name).
+-The startup code my initialise FPU block and clocks first.
+-The linker places the initial values of variables in ROM space and creates space for it in RAM section too. During startup a
+block copy from ROM to RAM is needed to initialise the variables.
+-Startup code will then clear the .bss section.Then it copies the data from ROM to data section(typically 0x2000 0000).
+-This is a standard compliant startup code ie. by the time main() is called the standard requires all the initialised variables to
+have the initial values and all the uninitialised variables to be zero.
+-Reset sequence of ARM cortex M processors:
+-In the debug window, even before the main(), how does the SP and PC has its initial value already in it?
+-The answer is at the address 0x00(start of the ROM). The first thing is the value of stack pointer followed by the first code to
+execute at 0x04. These are just words in the memory not instructions. So, after the reset the ARM processor is hardwired to copy
+the bits from 0x00 to SP register and all the bits except the LSB to PC. This is followed by vector table for exception handling.
+-For debugging it's fine to have an infinite loop for exception handling but not in production environment as it will be denial of service.
+
+Lesson 14: Startup Code-2.
+-The build process.Cross development(as opposed to native development) is where the build happens in a host machine and the
+executable is for some other target machine. The source files(.c) are fed to the C compiler that converts it to object files(.o
+or ELF(executable and linkable format)). All object files together with standard files and libraries as well as linker script is
+fed into linker which combines it into the final program. 
+-You can analyse the object files by tools such as objdump. It will list out all the program sections-
+    .data - for initialised data
+    .bss - for uninitialised data
+    .text - for code
+
+-Just after compiling, the address for the functions are not yet known, so the compiler puts generic addresses to it and for all
+the instructions that used the address/offset(BL instruction). This offset is fixed by the linker after the linker decides the
+address of such functions and variables. Therefore the linker must be specific for the processors.
+-The linker also resolves inter dependencies and make sure all the imported references are matched to the exported references. The
+linker works one object at a time so it maintains two lists,exported symbols and undefined symbols. For an object, it tries to
+find the imported symbols in the exported list, if not found will add it to the undefined symbols. If other object has the symbol
+for exported list then it is resolved and removed from the undefined list. If the undefined symbols is still not empty, it looks
+for standard libraries. The libraries are added to the final image iff it contains the symbol for the undefined lists. The
+libraries may come with its own set of imports. So the linker searches for all the libraries for the undefined symbols. These
+libraries typically contains the startup codes and will import main symbol which will be resolved as your source file is main. For
+developing own libraries, include only one function/one global variable in them ,else it will cause it to increase the size
+unnecessarily. When the undefined list is empty the linking process ends or else it throw linker error.
+
+-If needed to modify the existing vector table, you can add it as source files(but you have to use the non standard extensions as
+the C run time environment is not yet setup for running this code,so it wont have the initialization of .data section or clearing
+of .bss section) as it links before the iar standard libraries.
+-You can place the variable at a particular memory address or program section by the @ "section name" extension.
+-const int own_vector_table[] @ ".intvec" = {
+    SP,
+    PC 
+}
+
+without const the linker will put the vector table in the RAM region so you have to add const.
+
+Lesson 15: Startup Code-3.
+-extern will introduce a symbol for the compiler that can be resolved using the linker(useful for CSTACK$$LIMIT symbol provided by
+iar linker). After SP it is the address of reset handler that is copied into PC ie. address in ROM that is executed first.
+-&function_name and function_name is address of the function_name.
+-Standard way of coding exception is infinite loop while debugging. So use assert_failed("Hardfault",__LINE__), for production
+code, it will do some damage control,log the location of error and reset the processor.
+-All exceptions are not faults, so ideally provide option for them to be declared somewhere else if needed. If not used it should
+resort to default implementation. so __weak alias(non standard) does this job. For ex.
+-#pragma weak SVC_Handler = Unused_Handler//resort to Unused_Handler if not defined elsewhere by end of the linking process.
+-Inject fault to test these fault handlers. When a stack overflow hapens and the handler is called, the first instruction of
+handlers is a push to the stack, but that may not be right as the stack is already overflown and will trigger another fault and it
+will be denial of service. Generally one must not acces the stack in case of any fault as it might be already corrupted. IAR
+provides __stackless extension, that will ignore the calling convention and won't be able to return from the function, but this is
+what we need. So there won't be any push to stack instruction and the handler code will be executed. Good practice is to trigger
+all parts of code by injecting fault in them.
+-Good to keep a breakpoint in assert_failed(){
+    //Log error
+    NVIC_SysteReset();
+};
+
+Lesson 0x10: Interrupts Part-1.
+-System Timer(SysTick) is a 24-bit down counter ie. it counts down every CPU cycle. When zero it can generate an interrupt. After
+this reloads from STRELOAD register and continues the process. The CPU has built in hardware that samples the interrupt line
+after each instruction. If the line is low the CPU fetches the next instruction in the pipeline. When the interrupt line is high
+the built in hardware forces the CPU to execute the interrupt entry instructions(pre-emption). Interrupts are asynchronous. ARM
+Cortex M takes at least 12 cycles for interrupt entry instructions(they are generally the longest instructions). Cortex M CPUs
+have a primask bit to enable/disable interrupts. use _enable_interrupt() to set the primask.
+
+Lesson 17: Interrupts Part-2.
+-One can call ISR as a regular C function in ARM Cortex M processors. Other processors have different entry code and return
+through special instructions and typically they have to save and restore more CPU registers than regular functions, so they  can't
+be regular C functions. 
+-MSP430 has RETI return from interrupt instruction specially for returning from ISRs. For entering the ISR the MSP430 CPU pushes
+the SP and status register into stack for returning back to preempted point and also disable their registers like GIE. RETI pop
+the stack and resets the GIE bit and returns from the ISR. A function call from inside ISR needs to save more registers on stack
+to prevent clobbering. Normal function calls are synchronous but not the ISRs.
+
+https://www.freertos.org/FreeRTOS_Support_Forum_Archive/October_2011/freertos_System_tick_is_not_triggerred_4781833.html
+Lesson 18. Interrupts Part-3.
+-We can trigger interrupt in IAR debugger window by setting bits in ICSR. In ARM Cortex M , without FPU, the CPU will store
+R0-R3,R12,LR,PC,xPSR onto the stack. These are the AAPCS group of registers. Therefore, ISR in ARM Cortex M processors save the
+same set of registers as the function call so they can be called just like a regular C function. ISR return the standard way of BX
+LR instructions. But the value of LR register is 0xffff ffff9 to suggest that it returned from interrupt not a normal function.
+There are different special values that suggests different return modes in ARM. There is aligner word that so that the stack is
+always aligned for maximising efficient block copy of the register. With FPU the frame to be saved are much more and LR is 0xffff
+fffe9(interrupt return with FPU frame).
+
+->better to keep stack in the begining of the RAM section as stack overflow will result in a hard fault exception rather than
+corrupting RAM contents.
+
+Lesson 20: Race Conditions.
+-The ISRs might change the data in registers and when the ISR returns the code will be using old values of it causing logical
+errors in the code. The typical read,modify and write sequences are susceptible to these errors as they can be interrupted by
+interrupt in between those operations. When two or more pieces of code that can pre-empt each other access a shared resource, the
+result depends on the sequence of execution of these codes therefore a race condition. Bugs of race conditions are nasty(difficult
+to isolate/non reproducible) as individual pieces of codes work correctly, but only when they start preempt each other at various
+places it wont work. Race conditions are direct consequences of using interrupts. Ensuring one piece of concurrent code executes
+wihile accessing the shared resources eliminates race condition.Mutual exclusion by disable/enabling interrupts around critical
+section might eliminate such racy bugs. _disable_irq()/_enable_irq() are "intrinsic" functions that generate single machine
+instruction without any calling overhead. The interrupts that occur during critical sections fires immediately after interrupts
+are enabled. This serialize the access to shared resources. The ideal way is not to use any shared resources(for GPIO access
+bitbanding atomises the code into a single instruction). Use codes that access memory atomically in a single clock cycles.
+
+Lesson 21:Foreground/Background.(superloops or main+ISR) <-- one of the embedded software architecture.
+-The architecture consists of two main parts: the endless *background* loop inside the main() function and the interrupt handlers,
+like your SysTick_Handler() and possibly others, comprising the *foreground*. The interrupts running in the foreground preempt the
+background loop, but they always return to the point of preemption. The two parts of the system communicate with each other by
+means of shared variables, like l_tickCtr. To avoid race conditions due to preemption of the background loop by the foreground
+interrupts, these shared variables should be defined as volatile and must be protected by briefly disabling interrupts around any
+access to them from the background.
+-Typical software architecture is of main+ISRs code ie Background and Foreground codes. Normal LED blink is a sequential blocking
+code as it waits for the delay to timeout and the sequences is hardcoded in the sequence of the code. There can be non-blocking
+version of the background loop too(with finite state machines). When breaking into a sequential blocking code, mostly you find
+that ends up in the blocking part of the code. In a non-blocking state machine code(event driven), it will mostly end up in the
+main() itself on breaking. In an event driven code, the control is not blocked at any point so it can process events as soon as
+they arrive rather than to spend the time waiting for a timeout. But it becomes complex as the sequence of events is not hardcored
+in the code.
+-Moreover the event driven code spends hundreds of thousand times per second instead of once per second in the main loop and hence
+it can handle events as soon as they arrive and in the order they arrive.
+
+Lesson 22: RTOS-Part-1:
+-Extending the foreground/background architecture such that multiple background loops running seemingly simultaneously. RTOS is a
+sequential architecture. For example, to blink the LEDs truly independently, while preserving the simple sequential structure of
+the code, you would need not one but TWO background loops running somehow  simultaneously.
+-First primitive approach(hacky and illegal):
+-Put two functions blinky1() and blinky2() controlled by a volatile object so that the compiler does not optimise out any calls to
+them as each of them never returns due to while(1). Now let the code execute one of the functions. Put a breakpoint in the
+SysTick ISR handler and when it hits, change the PC from its stack frame to the address of the other function. Now resume the
+execution. It will be running the other function. This means:
+-Such switching the CPU between executing multiple background loops should be possible.
+-The general mechanism for such CPU context switching is to exploit the interrupt processing hardware already available in your processor.
+-The general idea of multitasking on a single CPU, which is to switch the CPU between executing different background loops, like
+your blinky1() and blinky2() here.
+-Why this is wont work with little more complex functions : In the case of the regular interrupt preemption, you save registers
+for the blinky1() thread and restore the registers for the same blinky1 thread. As long as you actually return to the blinky1()
+thread, everything is OK. However, when you manually modify the return address, you are returning to the blinky2 thread, but you
+still restore the registers saved originally for the blinky1 thread, which is exactly the illegal part. It happens to just work
+for the dead-simple blinky threads, but it can and will break down for more complex threads that use more registers. 
+-How to fix it :  You need to keep the register sets for different threads separate ,ie the registers saved for blinky1 cannot be
+restored for blinky2 and vice-versa. We have to use a separate, private stack for each thread. In C, such a memory area can be
+represented as an array of uint32_t words (corresponding to the 32-bit registers of the CPU) plus a stack pointer. ie 
+uint32_t stack_blinky1[40];
+uint32_t *sp_blinky1 = &stack_blinky1[40];
+/* fabricated Cortex-M ISR stack frame for blinky1 */
+*(--sp_blinky1) = (1U << 24);  /* xPSR */
+*(--sp_blinky1) = (uint32_t)&main_blinky1; /* PC */
+*(--sp_blinky1) = 0x0000000EU; /* LR  */
+*(--sp_blinky1) = 0x0000000CU; /* R12 */
+*(--sp_blinky1) = 0x00000003U; /* R3  */
+*(--sp_blinky1) = 0x00000002U; /* R2  */
+*(--sp_blinky1) = 0x00000001U; /* R1  */
+*(--sp_blinky1) = 0x00000000U; /* R0  */
+
+have an empty while(1) to prevent main from returning.
+
+-Now when you break at systick isr, change the SP to current top of the stack, ie value of sp_blinky1. On resuming you will find
+that it will restore the context from the RAM and will execute blink1(). Now again break at ISR(We break at the end of ISR so that
+CPU stores the current thread stack onto the private stack and when we return to this thread next time, it will resume from this
+point exactly as the threads will think it just returned from the ISR), and copy the updated sp_blinky1 as the blinky1 will change
+in course of executing the blink1 thread, and copy the sp_blinky2 into SP. Now resume and the blinky2() thread will execute. Even
+now when we execute the blinky1 thread again it will resume at precisely the point of preemption by the SysTick interrupt and not
+at the beginning of its thread function.
+-Now AAPCS tells that registers r4-r11 are not supposed to be clobbered by functions and if it does it must save it and restore
+upon return which is fine if the function is returning back to its point of preemption. But this is not the case with our code as
+it returns back to another piece of thread(not the whole thread as that will be AAPCS compliant) whic h need not be compliant with
+AAPCS and can change the other registers. The solution is to save the remaining 8 registers R4 through R11 on the
+-thread's stack at the end of the ISR, right before switching the context away from the thread. These registers must then be
+restored from the thread's stack right before returning to this thread from the ISR.
+-First, you need to append the additional registers to the fabricated stack frame for all your threads.
+-Second, when saving the current thread context, you need to save the additional 8 CPU registers R11 down to R4 on top of the
+current ISR stack frame.
+-And also you need to adjust the value of SP CPU register by subtracting 0x20 from the SP before saving it in the thread's stack pointer.
+-Second, when restoring the next thread, you need to restore the additional registers R11 down to R4 from the thread's stack to
+the CPU registers.
+-And finally, you need to add 0x20 to the thread's stack pointer before writing it to the CPU SP register.
+
+https://community.arm.com/developer/ip-products/system/b/embedded-blog/posts/cutting-through-the-confusion-with-arm-cortex-m-interrupt-priorities
+Lesson 22: RTOS-Part-2:
+-Automating the context switch in software is the job of kernel/scheduler. Context switch will happen on return from interrupt. An
+exception called PendSV, which exists for this specific purpose and virtually all RTOSes for Cortex-M use it for
+context-switching. PendSV is not that special and in principle you could use any other  asynchronous exception or interrupt for
+the purpose of context-switching. So a thread can be represented by a structure OSThread with (void)*sp member to remeber the
+threads SP. Data structure associated with a thread is called a Thread Control Block (TCB). Now we can replace the previous stack
+pointers of threads by OSThread objects. There must be a function that fabricates the stack for each thread:
+-OSThread_start(OSThread *me, OSThreadhandler, void *stkSto, uint32_t stkSize) ->stack pointer,function name,stack array,sizeof(stack array)
+-This function fabricates the private stack and stack pointer. You can call this in main.c as
+OSThread_start(&blink1,&main_blinky1,stack_blinky1,sizeof(stack_blinky1)); and similiar for blinky2 thread. Context switch must
+happen on return from interrupt. Make the PendSV interrupt least priority and triggers it at the end of SysTick such that systick
+executes first and then pendsv. OSsched will trigger the pendSV interrupt and decide which thread will run next. Actual context
+switch algorithm will be written in assembly in penSV handler. Tail chainning-when two interrupts are triggered consequently, then
+the frame is not stored when the first ISR returns and serivecs the next isr to be more efficient, so overhead is comparable to
+simple function call.This case of back-to-back interrupt processing, the ARM Cortex-M core skips the popping and pushing registers
+in the hardware optimization called "tail-chaining". So,the overhead is comparable to a simple function call.
+
+Lesson 24: RTOS part-3:
+-Round robin fashion of scheduling ie. the stack pointers of all the threads are stored in a array and everytime the context
+switch is triggered it runs the next thread in the sequence. Instead of checking the bounds of index using if..else it is better
+to use assertions. C language provides a standard assert() facility, which evaluates the expression and when it turns out to be
+false, the assert() macro prints a message to the screen and exits the application, which is not good for typical embedded
+systems. Use Q_ASSERT instead which evaluates and then reset the controller to avoid the denial of service failure(Design by
+Contract). Using RTOS makes the code composable ie addition of code is confined to the main file and does not require any change
+to other RTOS code. One should initialise interrupts only after allocating space for all the threads. 
+
+Lesson 25: RTOS part-4:
+-Instead of delay wasting cpu cycles, we can put the thread into blocking state and when the delay is elapsed the thread can
+resume executing. If all threads are in blocked state, the cpu will execute the idle thread which ideally puts the cpu in low
+power mode(_WFI()). It is efficient to store the state of the thread in single uint32_t as a bitmask so that if no threads are
+ready as simple comparison to 0 is enough. This is a baasic time shared round robin type of scheduler. OSThread structure will have a timeout member which handles the timing.
+
+Lesson 26: RTOS part-5:
+-Priority-based, preemptive scheduler with static priorities. to meet real time requirement of the systems under certain
+situations. A computation that is performed too late (or too early for that matter) is considered less useful and even harmful as
+an outright wrong computation. Instead of being logically correct, the computation must happen withhin a particular time frame
+also. Most real-time systems operate in a periodic fashion, meaning that the triggering events and the deadlines repeat with a
+certain period. OSThread structure will have a priority member which handles the priority. Rate Monotonic Analysis":If the cpu
+utilization is less than the theoritical bound then it is gauranteed that the threads will meet the timing specs, if the priority
+is assigned according to increasing period. It also applies to non periodic thread with variable execution time.
+
+Lesson 26: RTOS part-6:
+-Interrupts are only recognised at instruction boundaries after which the CPU needs to perform the interrupt entry. The time bw
+the interrupt and execution of the first instruction of ISR is interrupt latency.In RTOS, there are critical sections wherein the
+interrupts are disabled to avoid race conditions and therefore there is maximum interrupt latency parameter. For thread
+syncronization : semaphores( semaphore would be initially in the closed state, so any approaching train would need to wait.
+Pressing the button would signal the semaphore, which would release the train from waiting and let it continue around the track.)
+ie for signaling you would set the maximum count of one, meaning that the semaphore count would be allowed to take only two values
+zero, meaning that the semaphore is not and one,meaning that it is signaled. Such a semaphore is called the binary semaphore.
+Unblocking of  semaphore waiting to be unblocked inside a low priority thread may be delayed because it waiting for the higher
+priority thread being executed now.
+
+http://kalinskyassociates.com/Wpaper2.html
+Lesson 28: RTOS part-7:
+-Sharing resources among concurrent threads, and about the RTOS mechanisms for protecting such shared resources. How semaphore was
+used previously(The first such RTOS mechanism you learned about was the semaphore that you applied to synchronize your blinky-2
+thread with pressing of the SW1 switch on your TivaC LauchPad board.) Threads(run in the same address space) in embedded world are
+allowed to share resources(variables and memory mapped registers) unlike processes in desktop/server world which have different
+address spaces. Mutual exclusion mechanisms ensures mutually 
+-exclusive access to shared resources and make sure that only one thread uses the shared resource at any given time. One can
+disable and renable interrupts around a critical section but has two drawbacks-it might be inconsistent with RTOS interrupt policy
+and nesting critical sections may re-enable interrupts when the code is not ready and hence introducing race conditions. So use
+RTOS specific macros for enabling and disabling interrupts as they allow nesting ans wont mess the interrupt policy. Longer
+critical sections will increase interrupt latency in the system so keep them short. If critical section is longer then we have to
+use other mechanisms like semaphore,mutex,scheduler lock. The problem with them is unbounded priority inversion. Semaphores are
+not aware of the priorities of the threads it is blocking. Semaphores were invented in 1960 during time sharing era not the
+priority based scheduling era. It turns out that the classic semaphore, while still applicable to synchronizing threads as you saw
+in the last lesson, is NOT a good mechanism for mutual exclusion in priority-based systems. Two modern mutual exclusion mechanisms
+that prevent priority inversion as well as many other tricky problems, such as deadlock are selective scheduler locking up to the
+specified priority ceiling and priority ceiling mutex. This ceiling denotes the level up to which you lock the scheduler, meaning
+that all threads below  or equal to the ceiling won't be scheduled, but any threads above the ceiling are scheduled as usual. Of
+course,the ISRs, that run above all threads, are not affected at all, so 
+-there is no impact on the interrupt latency. This is a non blocking mechanism which is simple to implement in RTOS and is very
+efficent. The limitation is the thread cannot block(blocking-delay or the semaphore-wait APIs) while holding the lock and the
+RTOS should assert if done so. Also, many RTOSes provide only crude scheduler locking of all threads, which is unfortunately too
+pervasive. Think of a mutex as an RTOS object specifically designed for protecting resources shared among concurrent threads in
+the most generic case, where threads might block while accessing the shared resource. While initalizing mutex you give it a
+priority of highest priority + 1 and when a thread acquires a mutex its priority is promoted to that number. There is priority
+inheritance mutexes also. Big disadvantage of priority-inheritance is that it typically leads to many more expensive context
+switches than priority ceiling and complex timing analysis in a hard real-time systems and also mutual deadlock. The 1990's
+brought alternative real-time software architectures that avoid sharing of resources, and thus eliminate the need for complex
+mutual-exclusion mechanisms..Priority inheritance mutex are dynamic as the prioritets change when a high priority thread asks to
+unlock the thead whereas in ceiling mutex the priority is promoted to the highest at the begining.
+
+Lesson 29: OOP-part1-Encapsulation:
+-OOP is not the use of any specific language, but rather a way of software design based on the three fundamental concepts of:Encapsulation,
+-Inheritance and Polymorphism. In C, the "what has to be done" is in header(.h) file while "how it has to be done" is in
+source(.c) file. This is abstraction( because all the details of handling the cases abstracted away and simplified into
+operations like on, off, and toggle) and information hiding(because the information about specific ways of performing these
+operations for each cases is hidden from the users). The limitation in such a case is that the design handles only a fixed number
+of cases and it cannot be easily extended to handle an open-ended number of cases.
+
+
