@@ -1,8 +1,15 @@
 Lesson 1:Counting.
--Most of the ARM Cortex instruction takes 2 bytes in memory.
--ARM Cortex has 16 32-bit wide general purpose R0-R15. R15 is PC.
+Mental image - Big table of bytes, also we using C99 dialect(ave to look more into this)
+-Fundamental Definitions:
+1.Memory = Just a big table of bytes 
+2.Variables = Just a location in computer memory to store value ie. bytes ie. instructions
+3.Address = Simply numbers assigned to these locations 
+4.Instructions = Content of these locations
+-In hexadecimal 0x0 to 0xA is represented using 4-bits. So to represent a byte you'll need 2 hex digits. 32-bits have 4-bytes, so need 8 hex digits.
+-Most of the ARM Cortex instruction takes 2 bytes in memory and their purpose is to manipulate(store/clear/add etc.) contents inside the registers.
+-ARM Cortex has 16 32-bit wide general purpose R0-R15. R15 is PC.PC stores the address of the instruction to execute.
 -Instructions can typically manipulate registers in one clock cycle.
--Signed = integers are stored as 2's complement.
+-Signed = integers are stored as 2's complement and can represent positive as well as negative numbers(basically integers)
 -0x0000 0000(0) ... 0x7fff ffff(2^31-1 or 2147483647) (largest positive value 32-bit signed integer can represent).
 -On adding 1 to that, we make it to 0x8000 0000(-2^31 or -2147483648) (smallest negative value 32-bit signed integer can represent)
 all the way to 0xffff ffff(largest negative value it can represent ie -1).
