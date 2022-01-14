@@ -48,7 +48,11 @@ happen in the data registers, and the modified registers values can be stored ba
 
 ```C
 int *p_int;
-// Best way to handle C declarations is to read it backwards, so p_int, is a variable(location in the big table of bytes), that stores address(location) and those locations have integer values.
+/* Best way to handle C declarations is to read it backwards,
+so p_int, is a variable(location in the big table of bytes) 
+that stores address(location) and those locations have
+integer values.
+ */
 ```
 
 - referencing is to get the address, de-referencing is to get to the integer value stored there.
@@ -67,7 +71,11 @@ int *p_int;
 ```C
 //to provide clock to PORTF
 *((unsigned int *)0x400FE608U) = 0x20U; 
-// Note on type casting: the raw address is pre-appended by the the type of the value as in how to interpret the raw value in front of it. & operator does not need this as the compiler understands it from the variable declaration
+/* Note on type casting: the raw address is pre-appended by the the
+type of the value as in how to interpret the raw value in front of it.
+& operator does not need this as the compiler understands it from the
+variable declaration
+*/
 ```
 
 - We can make it blink by adding to looping statements after turning on and off the LED.
