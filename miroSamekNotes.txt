@@ -57,13 +57,13 @@ p_int = (int *)0x20000002u;//misaligned address can overwrite existing values in
 0002 corrupting a stored integer if already in placed at 0x2000  0000
 
 Lesson 4:Blinking the LED.
+Mental model- the big table of bytes are divided into sections, for flash, ram, peripherals, SFR's.
 -To blink LED, you have to know about the memory map of the microcontroller.
 -The technique to blocking clock to certain parts of the chip to save power is called clock gating.
 -So initially you cannot read any data at address of PORTF.
--While in debug mode, on setting the bit on clock gating control register, it provides clock to PORTF and you can see the data in
-that address range. The hardware block wakes up.
+-While in debug mode, on setting the bit on clock gating control register, it provides clock to PORTF and the debugger can see the data in that address range. The hardware block wakes up.
 -It boils down to writing a number to a memory address. So pointers in C, to deference the address directly and put a value to it.
--eg *((unsigned int *)0x400FE608U) = 0x20; //to provide clock to PORTF
+-eg *((unsigned int *)0x400FE608U) = 0x20U; //to provide clock to PORTF
 -We can make it blink by adding to looping statements after turning on and off the LED.
 
 Lesson 5:Preprocessor and Volatile.
@@ -76,14 +76,14 @@ writing a value at an address.
 -In the vendor provided file, the addresses are volatile unsigned long * as in 32-bit machine unsigned int and unsigned long are
 both 4 bytes long. Volatile tells the compiler that the value may change even though the program might not appear to change it.
 CPU can optimize access to non-volatile objects by reading the object into a register, working with that register for a while and
-then wrtiting the value back to the object. You can prevent the compiler to optimize any object away by declaring it as volatile.
+then writing the value back to the object. You can prevent the compiler to optimize any object away by declaring it as volatile.
 Volatile can be placed before or after the type ie volatile int and int volatile are the same.
 
 Lesson 6:Bitwise operators in C.
 Lesson 7:Arrays and Pointer Arithmetic
 -When you use Bitwise operators on registers, the compiler converts it into read,modify and write operations, as all the bits are
 collocated in a single byte with single address. If a interrupt happens after read and the ISR changes the state of register, and
-when the inerrupt returns the change will be lost as it will use the old value of register. This is not reentrant code. There is a
+when the interrupt returns the change will be lost as it will use the old value of register. This is not reentrant code. There is a
 way to address individual bits in a single operation, using bit-banding, where each bit has a different address, which can be
 accessed with array indexing.
 -This makes setting or clearing the bit a single STR instruction, making it interrupt-safe.
