@@ -2,6 +2,8 @@
 
 This document will have the notes for [this](https://www.youtube.com/playlist?list=PLGGUgnOTqaTvNkh003iPRPZ6sEtq7DRR4) playlist.
 
+---
+
 ## Lesson 1: Counting
 
 - Mental image: Big table of bytes, also we using C99 dialect(have to look more into this)
@@ -21,6 +23,8 @@ This document will have the notes for [this](https://www.youtube.com/playlist?li
 - On incrementing this again we get to `0x0000 0000` and the cycle repeats.
 - For unsigned integers it starts from `0x0000 0000`(smallest positive:0) to `0xffff ffff` (largest positive:`4294967295`)
 
+---
+
 [Saving-IAR-windows-layout](https://stackoverflow.com/questions/38459556/iar-window-layout)
 
 ## Lesson 2: Flow of Control
@@ -35,6 +39,8 @@ This document will have the notes for [this](https://www.youtube.com/playlist?li
 - Effects of loop in time critical code(ex. interrupt processing):
   - **Loop overhead**: the processor has to execute additional tests and jumps to handle the loop. Therefore can use loop unrolling to speed things up in time critical codes.
   - **Pipeline stalls**: ARM Cortex M uses pipeline to increase the throughput and increase the number of instructions processed in given time. Processor works with multiple instructions at various stages of completion. One instruction is divided into steps like fetch from memory,decode and execute. These individual steps take one clock cycle to execute. Pipeline works at full capacity when instructions are executed in order. When the ordering is disrupted by branch instruction, it has to discard the partially processed Instructions and restart pipelining at the new branched address as it has to now fetch the instructions pointed by the new value of the PC.
+
+---
 
 ## Lesson 3: Variables and Pointers
 
@@ -58,6 +64,8 @@ integer values.
 - referencing is to get the address, de-referencing is to get to the integer value stored there.
 `p_int = (int *)0x20000002u;`//misaligned address can overwrite existing values in memory addresses `0x20000000`
 - As the address `0x2000 0000` has `0x2000 0000`, `0x2000 0001`, `0x2000 0002`, `0x2000 0003` to store a 32 bit integer(4 bytes) and then uses `0x2000 0004` ... `0x2000 0007` to store the next integer. **p_int** is intentionally misaligned and code will store whatever value to `0x2000 0002` corrupting a stored integer if already in placed at `0x2000  0000`
+
+---
 
 ## Lesson 4: Blinking the LED
 
